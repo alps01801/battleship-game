@@ -1,0 +1,308 @@
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurable Battleship</title>
+
+<!-- CSS Styles -->
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+#controls {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 400px;
+    margin: 0 auto 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+#controls input, #controls select, #controls button {
+    margin: 5px;
+    padding: 8px;
+    font-size: 14px;
+}
+
+#status {
+    font-size: 18px;
+    margin: 15px 0;
+}
+
+.board {
+    display: grid;
+    gap: 4px;
+    justify-content: center;
+    margin: 10px auto 30px;
+}
+
+.cell {
+    width: 35px;
+    height: 35px;
+    background: #ddd;
+    border: 1px solid #999;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.cell.hit {
+    background: red;
+    color: white;
+}
+
+.cell.miss {
+    background: lightblue;
+}
+
+.hidden {
+    display: none;
+}
+</style>
+
+<!-- PWA manifest and iPhone settings -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Battleship Game">
+<link rel="apple-touch-icon" href="icon.png">
+
+</head>
+<body>
+
+<h1>Battleship</h1>
+
+<div id="controls">
+    <h3>Game Settings</h3>
+
+    <label>Grid Size:</label>
+    <input type="number" id="gridSize" value="10" min="5" max="15"><br>
+
+    <label>Number of Ships:</label>
+    <input type="number" id="numShips" value="5" min="1" max="50"><br>
+
+    <label>Players:</label>
+    <select id="numPlayers">
+        <option value="1">1 Player</option>
+        <option value="2">2 Players</option>
+    </select><br>
+
+    <button onclick="startGame()">Start Game</button>
+</div>
+
+<p id="status">Choose settings and start</p>
+
+<div id="gameArea" class="hidden">
+    <h3 id="turnText"></h3>
+    <div id="board" class="board"></div>
+    <button onclick="resetGame()">Restart</button>
+</div>
+
+<script>
+
+let GRID_SIZE = 10;
+let NUM_SHIPS = 5;
+let NUM_PLAYERS = 1;
+
+let boards = [];
+let currentPlayer = 0;
+let gameOver = false;
+
+
+// Create empty board
+function createBoard() {
+    let board = [];
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+        let row = [];
+        for (let j = 0; j < GRID_SIZE; j++) {
+            row.push(".");
+        }
+        board.push(row);
+    }
+
+    return board;
+}
+
+
+// Place ships randomly
+function placeShips(board) {
+    let ships = 0;
+
+    while (ships < NUM_SHIPS) {
+        let r = Math.floor(Math.random() * GRID_SIZE);
+        let c = Math.floor(Math.random() * GRID_SIZE);
+
+        if (board[r][c] === ".") {
+            board[r][c] = "S";
+            ships++;
+        }
+    }
+}
+
+
+// Setup all boards
+function setupBoards() {
+    boards = [];
+
+    for (let i = 0; i < NUM_PLAYERS; i++) {
+        let board = createBoard();
+        placeShips(board);
+        boards.push(board);
+    }
+}
+
+
+// Draw board
+function drawBoard() {
+
+    const boardDiv = document.getElementById("board");
+    boardDiv.innerHTML = "";
+
+    boardDiv.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 35px)`;
+
+    let enemy = (currentPlayer + 1) % NUM_PLAYERS;
+
+    let board = boards[enemy];
+
+    for (let i = 0; i < GRID_SIZE; i++) {
+        for (let j = 0; j < GRID_SIZE; j++) {
+
+            const cell = document.createElement("button");
+            cell.classList.add("cell");
+
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+
+            cell.addEventListener("click", fire);
+
+            if (board[i][j] === "X") {
+                cell.classList.add("hit");
+                cell.textContent = "X";
+            }
+
+            if (board[i][j] === "O") {
+                cell.classList.add("miss");
+                cell.textContent = "O";
+            }
+
+            boardDiv.appendChild(cell);
+        }
+    }
+}
+
+
+// Fire at cell
+function fire(e) {
+
+    if (gameOver) return;
+
+    let r = e.target.dataset.row;
+    let c = e.target.dataset.col;
+
+    let enemy = (currentPlayer + 1) % NUM_PLAYERS;
+    let board = boards[enemy];
+
+    if (board[r][c] === "S") {
+        board[r][c] = "X";
+        document.getElementById("status").textContent = "HIT!";
+    }
+    else if (board[r][c] === "X" || board[r][c] === "O") {
+        document.getElementById("status").textContent = "Already used";
+        return;
+    }
+    else {
+        board[r][c] = "O";
+        document.getElementById("status").textContent = "MISS!";
+    }
+
+    if (checkGameOver(board)) {
+        gameOver = true;
+        document.getElementById("status").textContent = `Player ${currentPlayer + 1} Wins!`;
+        return;
+    }
+
+    if (NUM_PLAYERS === 2) {
+        currentPlayer = enemy;
+        updateTurnText();
+    }
+
+    drawBoard();
+}
+
+
+// Check game over
+function checkGameOver(board) {
+
+    for (let row of board) {
+        for (let cell of row) {
+            if (cell === "S") return false;
+        }
+    }
+
+    return true;
+}
+
+
+// Update turn display
+function updateTurnText() {
+
+    if (NUM_PLAYERS === 1) {
+        document.getElementById("turnText").textContent = "Player vs Computer";
+    }
+    else {
+        document.getElementById("turnText").textContent = `Player ${currentPlayer + 1}'s Turn`;
+    }
+}
+
+
+// Start game
+function startGame() {
+
+    GRID_SIZE = parseInt(document.getElementById("gridSize").value);
+    NUM_SHIPS = parseInt(document.getElementById("numShips").value);
+    NUM_PLAYERS = parseInt(document.getElementById("numPlayers").value);
+
+    if (NUM_SHIPS >= GRID_SIZE * GRID_SIZE) {
+        alert("Too many ships for this grid size!");
+        return;
+    }
+
+    currentPlayer = 0;
+    gameOver = false;
+
+    setupBoards();
+
+    document.getElementById("controls").classList.add("hidden");
+    document.getElementById("gameArea").classList.remove("hidden");
+
+    document.getElementById("status").textContent = "Game Started!";
+
+    updateTurnText();
+    drawBoard();
+}
+
+
+// Reset game
+function resetGame() {
+
+    gameOver = false;
+    currentPlayer = 0;
+
+    document.getElementById("controls").classList.remove("hidden");
+    document.getElementById("gameArea").classList.add("hidden");
+
+    document.getElementById("status").textContent = "Choose settings and start";
+}
+
+</script>
+
+</body>
+</html>
