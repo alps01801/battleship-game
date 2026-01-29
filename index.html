@@ -1,9 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Configurable Battleship</title>
 
-<!-- CSS Styles -->
 <style>
 body {
     font-family: Arial, sans-serif;
@@ -13,9 +14,7 @@ body {
     padding: 20px;
 }
 
-h1 {
-    margin-bottom: 10px;
-}
+h1 { margin-bottom: 10px; }
 
 #controls {
     background: white;
@@ -32,10 +31,7 @@ h1 {
     font-size: 14px;
 }
 
-#status {
-    font-size: 18px;
-    margin: 15px 0;
-}
+#status { font-size: 18px; margin: 15px 0; }
 
 .board {
     display: grid;
@@ -53,18 +49,10 @@ h1 {
     font-size: 16px;
 }
 
-.cell.hit {
-    background: red;
-    color: white;
-}
+.cell.hit { background: red; color: white; }
+.cell.miss { background: lightblue; }
 
-.cell.miss {
-    background: lightblue;
-}
-
-.hidden {
-    display: none;
-}
+.hidden { display: none; }
 </style>
 
 <!-- PWA manifest and iPhone settings -->
@@ -81,7 +69,6 @@ h1 {
 
 <div id="controls">
     <h3>Game Settings</h3>
-
     <label>Grid Size:</label>
     <input type="number" id="gridSize" value="10" min="5" max="15"><br>
 
@@ -106,52 +93,38 @@ h1 {
 </div>
 
 <script>
-
 let GRID_SIZE = 10;
 let NUM_SHIPS = 5;
 let NUM_PLAYERS = 1;
 
-let boards = [];
+let boards = [];       // holds boards for all players
 let currentPlayer = 0;
 let gameOver = false;
-
 
 // Create empty board
 function createBoard() {
     let board = [];
-
     for (let i = 0; i < GRID_SIZE; i++) {
         let row = [];
-        for (let j = 0; j < GRID_SIZE; j++) {
-            row.push(".");
-        }
+        for (let j = 0; j < GRID_SIZE; j++) row.push(".");
         board.push(row);
     }
-
     return board;
 }
-
 
 // Place ships randomly
 function placeShips(board) {
     let ships = 0;
-
     while (ships < NUM_SHIPS) {
         let r = Math.floor(Math.random() * GRID_SIZE);
         let c = Math.floor(Math.random() * GRID_SIZE);
-
-        if (board[r][c] === ".") {
-            board[r][c] = "S";
-            ships++;
-        }
+        if (board[r][c] === ".") { board[r][c] = "S"; ships++; }
     }
 }
 
-
-// Setup all boards
+// Setup boards for all players
 function setupBoards() {
     boards = [];
-
     for (let i = 0; i < NUM_PLAYERS; i++) {
         let board = createBoard();
         placeShips(board);
@@ -159,149 +132,131 @@ function setupBoards() {
     }
 }
 
-
-// Draw board
+// Draw single board (shows enemy board for current turn)
 function drawBoard() {
-
     const boardDiv = document.getElementById("board");
     boardDiv.innerHTML = "";
-
     boardDiv.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 35px)`;
 
-    let enemy = (currentPlayer + 1) % NUM_PLAYERS;
-
+    let enemy = (NUM_PLAYERS === 1) ? 0 : (currentPlayer + 1) % NUM_PLAYERS;
     let board = boards[enemy];
 
     for (let i = 0; i < GRID_SIZE; i++) {
         for (let j = 0; j < GRID_SIZE; j++) {
-
             const cell = document.createElement("button");
             cell.classList.add("cell");
-
             cell.dataset.row = i;
             cell.dataset.col = j;
-
             cell.addEventListener("click", fire);
 
-            if (board[i][j] === "X") {
-                cell.classList.add("hit");
-                cell.textContent = "X";
-            }
-
-            if (board[i][j] === "O") {
-                cell.classList.add("miss");
-                cell.textContent = "O";
-            }
+            if (board[i][j] === "X") { cell.classList.add("hit"); cell.textContent = "X"; }
+            if (board[i][j] === "O") { cell.classList.add("miss"); cell.textContent = "O"; }
 
             boardDiv.appendChild(cell);
         }
     }
 }
 
-
-// Fire at cell
+// Handle cell click
 function fire(e) {
-
     if (gameOver) return;
 
     let r = e.target.dataset.row;
     let c = e.target.dataset.col;
-
-    let enemy = (currentPlayer + 1) % NUM_PLAYERS;
+    let enemy = (NUM_PLAYERS === 1) ? 0 : (currentPlayer + 1) % NUM_PLAYERS;
     let board = boards[enemy];
 
     if (board[r][c] === "S") {
         board[r][c] = "X";
         document.getElementById("status").textContent = "HIT!";
-    }
-    else if (board[r][c] === "X" || board[r][c] === "O") {
+    } else if (board[r][c] === "X" || board[r][c] === "O") {
         document.getElementById("status").textContent = "Already used";
         return;
-    }
-    else {
+    } else {
         board[r][c] = "O";
         document.getElementById("status").textContent = "MISS!";
     }
 
+    drawBoard();
+
     if (checkGameOver(board)) {
         gameOver = true;
-        document.getElementById("status").textContent = `Player ${currentPlayer + 1} Wins!`;
+        document.getElementById("status").textContent = (NUM_PLAYERS === 1 ? "You Win!" : `Player ${currentPlayer + 1} Wins!`);
         return;
     }
 
+    // 1-player mode: computer move
+    if (NUM_PLAYERS === 1 && !gameOver) computerMove();
+
+    // 2-player mode: toggle turn
     if (NUM_PLAYERS === 2) {
         currentPlayer = enemy;
         updateTurnText();
     }
-
-    drawBoard();
 }
 
+// Computer randomly selects a cell
+function computerMove() {
+    let playerBoard = boards[0]; // player board is index 0
+    let r, c;
+    do {
+        r = Math.floor(Math.random() * GRID_SIZE);
+        c = Math.floor(Math.random() * GRID_SIZE);
+    } while (playerBoard[r][c] === "X" || playerBoard[r][c] === "O");
 
-// Check game over
-function checkGameOver(board) {
+    if (playerBoard[r][c] === "S") { playerBoard[r][c] = "X"; document.getElementById("status").textContent = "Computer HIT!"; }
+    else { playerBoard[r][c] = "O"; document.getElementById("status").textContent = "Computer MISS!"; }
 
-    for (let row of board) {
-        for (let cell of row) {
-            if (cell === "S") return false;
-        }
+    drawBoard();
+
+    if (checkGameOver(playerBoard)) {
+        gameOver = true;
+        document.getElementById("status").textContent = "Computer Wins!";
     }
+}
 
+// Check if all ships on a board are sunk
+function checkGameOver(board) {
+    for (let row of board) {
+        for (let cell of row) if (cell === "S") return false;
+    }
     return true;
 }
 
-
 // Update turn display
 function updateTurnText() {
-
-    if (NUM_PLAYERS === 1) {
-        document.getElementById("turnText").textContent = "Player vs Computer";
-    }
-    else {
-        document.getElementById("turnText").textContent = `Player ${currentPlayer + 1}'s Turn`;
-    }
+    if (NUM_PLAYERS === 1) document.getElementById("turnText").textContent = "Player vs Computer";
+    else document.getElementById("turnText").textContent = `Player ${currentPlayer + 1}'s Turn`;
 }
-
 
 // Start game
 function startGame() {
-
     GRID_SIZE = parseInt(document.getElementById("gridSize").value);
     NUM_SHIPS = parseInt(document.getElementById("numShips").value);
     NUM_PLAYERS = parseInt(document.getElementById("numPlayers").value);
 
-    if (NUM_SHIPS >= GRID_SIZE * GRID_SIZE) {
-        alert("Too many ships for this grid size!");
-        return;
-    }
+    if (NUM_SHIPS >= GRID_SIZE * GRID_SIZE) { alert("Too many ships for this grid size!"); return; }
 
     currentPlayer = 0;
     gameOver = false;
-
     setupBoards();
 
     document.getElementById("controls").classList.add("hidden");
     document.getElementById("gameArea").classList.remove("hidden");
-
     document.getElementById("status").textContent = "Game Started!";
 
     updateTurnText();
     drawBoard();
 }
 
-
 // Reset game
 function resetGame() {
-
     gameOver = false;
     currentPlayer = 0;
-
     document.getElementById("controls").classList.remove("hidden");
     document.getElementById("gameArea").classList.add("hidden");
-
     document.getElementById("status").textContent = "Choose settings and start";
 }
-
 </script>
 
 </body>
